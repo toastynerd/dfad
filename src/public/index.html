@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Deploy for a Day</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --border: #2a2a38;
+    --text: #e8e8f0;
+    --muted: #6a6a82;
+    --accent: #7c3aed;
+    --accent2: #0ea5e9;
+    --ok: #22c55e;
+    --err: #ef4444;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 20px;
+  }
+  header { text-align: center; margin-bottom: 8px; }
+  .logo { font-size: 2.4rem; font-weight: 800; letter-spacing: 0.04em; }
+  .logo .d { color: var(--accent); }
+  .logo .a { color: var(--accent2); }
+  .tagline {
+    margin-top: 8px; color: var(--muted); font-size: 0.85rem;
+    letter-spacing: 0.04em; max-width: 460px; line-height: 1.5;
+  }
+  main { width: 100%; max-width: 560px; margin-top: 32px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 24px;
+  }
+  .drop {
+    border: 2px dashed var(--border); border-radius: 12px;
+    padding: 40px 20px; text-align: center; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .drop:hover, .drop.over { border-color: var(--accent); background: #1a1a24; }
+  .drop strong { color: var(--text); }
+  .drop .hint { display: block; margin-top: 8px; color: var(--muted); font-size: 0.8rem; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab {
+    flex: 1; padding: 8px; border: 1px solid var(--border); background: transparent;
+    color: var(--muted); border-radius: 8px; cursor: pointer; font-size: 0.85rem;
+  }
+  .tab.active { color: var(--text); border-color: var(--accent); background: #1a1a24; }
+  textarea {
+    width: 100%; min-height: 220px; resize: vertical; background: #0d0d14;
+    color: var(--text); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.82rem;
+  }
+  .btn {
+    margin-top: 16px; width: 100%; padding: 13px; border: none; border-radius: 10px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2)); color: white;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+  }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .hidden { display: none; }
+  .msg { margin-top: 16px; font-size: 0.85rem; }
+  .msg.err { color: var(--err); }
+  .result {
+    margin-top: 20px; padding: 18px; border: 1px solid var(--border);
+    border-radius: 12px; background: #0d0d14;
+  }
+  .result .label { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; }
+  .linkrow { display: flex; gap: 8px; margin-top: 8px; }
+  .linkrow input {
+    flex: 1; background: #0a0a0f; border: 1px solid var(--border); color: var(--accent2);
+    border-radius: 8px; padding: 10px; font-family: ui-monospace, monospace; font-size: 0.85rem;
+  }
+  .copy { padding: 0 16px; border: 1px solid var(--border); background: var(--surface);
+          color: var(--text); border-radius: 8px; cursor: pointer; }
+  .copy:hover { border-color: var(--accent); }
+  .expiry { margin-top: 12px; color: var(--ok); font-size: 0.82rem; }
+  footer { margin-top: 40px; color: var(--muted); font-size: 0.75rem; text-align: center; }
+  a { color: var(--accent2); }
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo"><span class="d">deploy</span> for <span class="a">a day</span></div>
+    <p class="tagline">Drop a single self-contained <code>.html</code> file and get a public link that works for 24 hours, then vanishes.</p>
+  </header>
+
+  <main>
+    <div class="card">
+      <div class="tabs">
+        <button class="tab active" id="tab-file" type="button">Upload file</button>
+        <button class="tab" id="tab-paste" type="button">Paste HTML</button>
+      </div>
+
+      <div id="pane-file">
+        <div class="drop" id="drop">
+          <strong id="drop-label">Drop your .html here, or click to choose</strong>
+          <span class="hint">Single page, max 5&nbsp;MB. External CDN scripts &amp; fonts are fine.</span>
+        </div>
+        <input type="file" id="file" accept=".html,.htm,text/html" class="hidden" />
+      </div>
+
+      <div id="pane-paste" class="hidden">
+        <textarea id="html" placeholder="<!doctype html>&#10;<html>...</html>"></textarea>
+      </div>
+
+      <button class="btn" id="deploy" type="button" disabled>Deploy</button>
+      <div class="msg" id="msg"></div>
+
+      <div class="result hidden" id="result">
+        <div class="label">Your link (live for 24h)</div>
+        <div class="linkrow">
+          <input id="link" readonly />
+          <button class="copy" id="copy" type="button">Copy</button>
+        </div>
+        <div class="expiry" id="expiry"></div>
+      </div>
+    </div>
+    <footer>Apps run in your browser as-is. Don't upload anything sensitive &mdash; links are public and guessable only by the random id.</footer>
+  </main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let mode = "file";
+  let chosenFile = null;
+
+  function setMode(m) {
+    mode = m;
+    $("tab-file").classList.toggle("active", m === "file");
+    $("tab-paste").classList.toggle("active", m === "paste");
+    $("pane-file").classList.toggle("hidden", m !== "file");
+    $("pane-paste").classList.toggle("hidden", m !== "paste");
+    refresh();
+  }
+  $("tab-file").onclick = () => setMode("file");
+  $("tab-paste").onclick = () => setMode("paste");
+
+  const drop = $("drop");
+  drop.onclick = () => $("file").click();
+  drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave = () => drop.classList.remove("over");
+  drop.ondrop = (e) => {
+    e.preventDefault();
+    drop.classList.remove("over");
+    if (e.dataTransfer.files[0]) pickFile(e.dataTransfer.files[0]);
+  };
+  $("file").onchange = (e) => { if (e.target.files[0]) pickFile(e.target.files[0]); };
+
+  function pickFile(f) {
+    chosenFile = f;
+    $("drop-label").textContent = f.name + "  (" + Math.round(f.size / 1024) + " KB)";
+    refresh();
+  }
+  $("html").oninput = refresh;
+
+  function refresh() {
+    const has = mode === "file" ? !!chosenFile : $("html").value.trim().length > 0;
+    $("deploy").disabled = !has;
+  }
+
+  function setMsg(text, isErr) {
+    const el = $("msg");
+    el.textContent = text || "";
+    el.className = "msg" + (isErr ? " err" : "");
+  }
+
+  $("deploy").onclick = async () => {
+    $("deploy").disabled = true;
+    setMsg("Deploying…", false);
+    $("result").classList.add("hidden");
+    try {
+      let res;
+      if (mode === "file") {
+        const fd = new FormData();
+        fd.append("file", chosenFile);
+        res = await fetch("/api/deploy", { method: "POST", body: fd });
+      } else {
+        res = await fetch("/api/deploy", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ html: $("html").value }),
+        });
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+      showResult(data);
+      setMsg("", false);
+    } catch (err) {
+      setMsg(err.message || "Something went wrong.", true);
+    } finally {
+      refresh();
+    }
+  };
+
+  function showResult(data) {
+    $("link").value = data.url;
+    $("result").classList.remove("hidden");
+    const expEl = $("expiry");
+    function tick() {
+      const left = data.expiresAt * 1000 - Date.now();
+      if (left <= 0) { expEl.textContent = "Expired."; return; }
+      const h = Math.floor(left / 3.6e6);
+      const m = Math.floor((left % 3.6e6) / 6e4);
+      expEl.textContent = "Expires in " + h + "h " + m + "m";
+      setTimeout(tick, 30000);
+    }
+    tick();
+  }
+
+  $("copy").onclick = async () => {
+    try {
+      await navigator.clipboard.writeText($("link").value);
+      $("copy").textContent = "Copied!";
+      setTimeout(() => ($("copy").textContent = "Copy"), 1500);
+    } catch {
+      $("link").select();
+    }
+  };
+</script>
+</body>
+</html>
