@@ -16,6 +16,15 @@ export interface MetadataStore {
   put(d: Deployment): Promise<void>;
   get(id: string): Promise<Deployment | null>;
   delete(id: string): Promise<void>;
+  /**
+   * Atomically increment a per-IP counter for the current time window and return
+   * the new count. Used for upload rate limiting; the item self-expires via TTL.
+   */
+  incrementRate(ipHash: string, windowSeconds: number): Promise<number>;
+}
+
+function rateKey(ipHash: string, windowSeconds: number, nowSec: number): string {
+  return `rl#${ipHash}#${Math.floor(nowSec / windowSeconds)}`;
 }
 
 // ---- Local JSON driver (dev / no AWS) ----
@@ -48,6 +57,15 @@ class LocalMetadata implements MetadataStore {
       if (err?.code !== "ENOENT") throw err;
     }
   }
+
+  // In-memory window counter (single-process dev only).
+  private rates = new Map<string, number>();
+  async incrementRate(ipHash: string, windowSeconds: number): Promise<number> {
+    const key = rateKey(ipHash, windowSeconds, Math.floor(Date.now() / 1000));
+    const next = (this.rates.get(key) ?? 0) + 1;
+    this.rates.set(key, next);
+    return next;
+  }
 }
 
 // ---- DynamoDB driver ----
@@ -77,6 +95,22 @@ class DynamoMetadata implements MetadataStore {
 
   async delete(id: string): Promise<void> {
     await this.doc.send(new this.lib.DeleteCommand({ TableName: this.table, Key: { id } }));
+  }
+
+  async incrementRate(ipHash: string, windowSeconds: number): Promise<number> {
+    const now = Math.floor(Date.now() / 1000);
+    const id = rateKey(ipHash, windowSeconds, now);
+    const out = await this.doc.send(
+      new this.lib.UpdateCommand({
+        TableName: this.table,
+        Key: { id },
+        UpdateExpression: "ADD #c :one SET expiresAt = if_not_exists(expiresAt, :exp)",
+        ExpressionAttributeNames: { "#c": "count" },
+        ExpressionAttributeValues: { ":one": 1, ":exp": now + windowSeconds * 2 },
+        ReturnValues: "UPDATED_NEW",
+      })
+    );
+    return Number(out.Attributes?.count ?? 1);
   }
 }
 

@@ -11,21 +11,22 @@
     "start": "node dist/server.js",
     "dev": "node --import tsx --watch src/server.ts",
     "test": "node --import tsx --test src/**/*.test.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "package:lambda": "esbuild src/lambda.ts --bundle --platform=node --target=node20 --format=cjs --minify --outfile=build/lambda.js && cp src/public/index.html build/index.html && printf '{\"type\":\"commonjs\"}' > build/package.json"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.620.0",
     "@aws-sdk/client-s3": "^3.620.0",
     "@aws-sdk/lib-dynamodb": "^3.620.0",
+    "@aws-sdk/s3-presigned-post": "^3.620.0",
     "@fastify/multipart": "^9.0.1",
-    "@fastify/rate-limit": "^10.1.1",
-    "@fastify/static": "^8.0.1",
     "fastify": "^5.1.0",
     "nanoid": "^5.0.7",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",
+    "esbuild": "^0.24.0",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2"
   }

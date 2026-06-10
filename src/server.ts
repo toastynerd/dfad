@@ -1,6 +1,5 @@
 import Fastify from "fastify";
 import multipart from "@fastify/multipart";
-import rateLimit from "@fastify/rate-limit";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
@@ -9,16 +8,7 @@ import { deployRoutes } from "./routes/deploy.js";
 import { serveRoutes } from "./routes/serve.js";
 
 export async function buildApp() {
-  const app = Fastify({
-    logger: true,
-    bodyLimit: config.MAX_BYTES + 1024, // headroom for JSON envelope around pasted HTML
-  });
-
-  await app.register(rateLimit, {
-    global: false, // opt-in per route (only uploads are limited)
-    max: config.RATE_LIMIT_MAX,
-    timeWindow: config.RATE_LIMIT_WINDOW,
-  });
+  const app = Fastify({ logger: true, bodyLimit: 1024 * 1024 });
 
   await app.register(multipart, {
     limits: { fileSize: config.MAX_BYTES, files: 1 },

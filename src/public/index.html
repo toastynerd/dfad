@@ -173,23 +173,38 @@
 
   $("deploy").onclick = async () => {
     $("deploy").disabled = true;
-    setMsg("Deploying…", false);
     $("result").classList.add("hidden");
     try {
-      let res;
-      if (mode === "file") {
-        const fd = new FormData();
-        fd.append("file", chosenFile);
-        res = await fetch("/api/deploy", { method: "POST", body: fd });
-      } else {
-        res = await fetch("/api/deploy", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ html: $("html").value }),
-        });
-      }
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+      // The file to deploy: either the chosen file, or pasted HTML as a blob.
+      const file =
+        mode === "file"
+          ? chosenFile
+          : new File([$("html").value], "app.html", { type: "text/html" });
+
+      // Step 1 — ask the server for an id and a direct-upload target.
+      setMsg("Preparing…", false);
+      const initRes = await fetch("/api/deploy", { method: "POST" });
+      const init = await initRes.json().catch(() => ({}));
+      if (!initRes.ok) throw new Error(init.error || "HTTP " + initRes.status);
+
+      // Step 2 — upload the file straight to the target (S3 or local endpoint).
+      setMsg("Uploading…", false);
+      const fd = new FormData();
+      for (const [k, v] of Object.entries(init.upload.fields)) fd.append(k, v);
+      fd.append("file", file); // must be last for S3 presigned POST
+      const up = await fetch(init.upload.url, { method: "POST", body: fd });
+      if (!up.ok) throw new Error("Upload failed (" + up.status + "). File may be too large.");
+
+      // Step 3 — finalize: server validates the object and records the link.
+      setMsg("Finishing…", false);
+      const finRes = await fetch("/api/finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: init.id }),
+      });
+      const data = await finRes.json().catch(() => ({}));
+      if (!finRes.ok) throw new Error(data.error || "HTTP " + finRes.status);
+
       showResult(data);
       setMsg("", false);
     } catch (err) {

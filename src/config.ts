@@ -9,6 +9,9 @@ const schema = z.object({
   IP_HASH_SALT: z.string().default("change-me"),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
   RATE_LIMIT_WINDOW: z.string().default("10 minutes"),
+  RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(600),
+  // Allowed browser origin for direct-to-S3 uploads (the UI host). "*" in dev.
+  UPLOAD_CORS_ORIGIN: z.string().default("*"),
   STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
   LOCAL_DATA_DIR: z.string().default("./.data"),
   AWS_REGION: z.string().default("us-east-1"),
